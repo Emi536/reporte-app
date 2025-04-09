@@ -10,10 +10,17 @@ if password != "casino123":
 
 # --- FUNCIÓN DE PROCESAMIENTO ---
 def procesar_reporte(df):
-    df.columns = [
+    columnas_esperadas = [
         "ID", "Tipo", "Monto", "?1", "?2", "?3", "Saldo",
         "Fecha", "Hora", "UsuarioSistema", "Plataforma", "Admin", "Jugador"
     ]
+
+    if len(df.columns) != len(columnas_esperadas):
+        st.error(f"❌ El archivo tiene {len(df.columns)} columnas pero se esperaban {len(columnas_esperadas)}.")
+        st.info("Asegurate de estar subiendo un archivo con el formato correcto.")
+        st.stop()
+
+    df.columns = columnas_esperadas
 
     df_cargas = df[df["Tipo"] == "in"]
 
@@ -63,6 +70,7 @@ if archivo is not None:
 
         with open("reporte_casino_resultado.xlsx", "rb") as file:
             st.download_button("📥 Descargar Reporte en Excel", file, file_name="Top_Reporte_Casino.xlsx")
+
     except Exception as e:
-        st.error(f"Error al leer el archivo: {e}")
+        st.error(f"❌ Error al leer el archivo: {e}")
         st.stop()
