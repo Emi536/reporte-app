@@ -12,7 +12,7 @@ if password != "casino123":
 def procesar_reporte(df):
     columnas_esperadas = [
         "ID", "Tipo", "Monto", "?1", "?2", "?3", "Saldo",
-        "Fecha", "Hora", "UsuarioSistema", "Plataforma", "Admin", "Jugador"
+        "Fecha", "Hora", "UsuarioSistema", "Plataforma", "Admin", "Jugador", "Extra"
     ]
 
     if len(df.columns) != len(columnas_esperadas):
