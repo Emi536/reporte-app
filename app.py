@@ -1,18 +1,9 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-from io import BytesIO
-import datetime
-
-st.set_page_config(page_title="VIPS", layout="wide")
-st.markdown("<h1 style='text-align: center; color:#F44336;'>Player Metrics</h1>", unsafe_allow_html=True)
-
-seccion = st.sidebar.radio("Seleccioná una sección:", ["👑 Comunidad VIP", "🎰 Comunidad VIP - Eros"])
-
-# --- FUNCIONES ---
 def preparar_dataframe(df):
-    df.columns = df.columns.str.strip().str.lower()  # normalizar columnas
-    df = df.rename(columns={
+    # Normalizar columnas: eliminar espacios, pasar a minúsculas
+    df.columns = df.columns.str.strip().str.lower()
+
+    # Crear un diccionario flexible que funcione aunque haya errores de codificación
+    rename_dict = {
         "operación": "Tipo",
         "depositar": "Monto",
         "retirar": "Retiro",
@@ -20,13 +11,17 @@ def preparar_dataframe(df):
         "límites": "?3",
         "balance antes de operación": "Saldo",
         "fecha": "Fecha",
-        "tiempo": "Hora",
+        "tiempo": "Hora",  # <-- esta es clave
         "iniciador": "UsuarioSistema",
         "del usuario": "Plataforma",
         "sistema": "Admin",
         "al usuario": "Jugador",
         "ip": "Extra"
-    })
+    }
+    st.write("Columnas disponibles:", df.columns.tolist())
+
+    # Renombrar solo si la clave existe
+    df = df.rename(columns={col: rename_dict[col] for col in df.columns if col in rename_dict})
     return df
 
 if seccion == "👑 Comunidad VIP":
