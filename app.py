@@ -38,7 +38,6 @@ if seccion == "👑 Comunidad VIP":
 
         if df is not None:
             df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-            df["Hora"] = pd.to_datetime(df["Hora"], format="%H:%M:%S", errors="coerce").dt.hour
             df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
             df["Jugador"] = df["Jugador"].astype(str).str.strip()
             df["Jugador_normalizado"] = df["Jugador"].str.lower()
