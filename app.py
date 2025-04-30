@@ -102,18 +102,22 @@ if seccion == "👑 Comunidad VIP":
             # 5. Mostrar tabla
             st.dataframe(posibles_vips)
 
-            # --- 5. Visualización de crecimiento mensual de VIPs (si tenés fechas de ingreso) ---
-            # Esto es opcional: si tenés una columna con "Fecha_Ingreso_VIP"
-            # podés graficar cómo crece la comunidad VIP
-            st.subheader("📈 Simulación de Crecimiento Mensual de VIPs (manual)")
-            fecha_simulada = st.date_input("Fecha simulada de ingreso de nuevos VIPs", pd.Timestamp.today())
-            posibles_vips["Fecha_Ingreso"] = fecha_simulada
+            # --- 5. Visualización de crecimiento mensual de VIPs (simulación manual) ---
+            st.subheader("📈 Simulación de Crecimiento Mensual de VIPs")
+            
+            fecha_simulada = st.date_input("Fecha simulada de ingreso de estos posibles VIPs", pd.Timestamp.today())
+            
+            # Crear columna con misma fecha para todos
+            posibles_vips["Fecha_Ingreso"] = pd.to_datetime(fecha_simulada)
+            
+            # Convertir a periodo mensual correctamente
             posibles_vips["Mes"] = posibles_vips["Fecha_Ingreso"].dt.to_period("M")
+            
+            # Agrupar y graficar
             crecimiento = posibles_vips.groupby("Mes").size().reset_index(name="Nuevos_VIPs")
             if not crecimiento.empty:
                 graf_vip = px.bar(crecimiento, x="Mes", y="Nuevos_VIPs", title="Crecimiento estimado de la comunidad VIP")
                 st.plotly_chart(graf_vip, use_container_width=True)
-
             # --- 6. Simulador de Recompensa VIP ---
             st.subheader("🎁 Simulador de Recompensa VIP")
             jugador_input = st.selectbox("Seleccioná un jugador para simular", df["Jugador"].unique())
