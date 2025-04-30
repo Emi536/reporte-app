@@ -91,10 +91,12 @@ if seccion == "👑 Comunidad VIP":
             posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
             st.dataframe(posibles_vips)
 
+            # --- 4.1 Análisis de Horario Dominante VIPs ---
             st.subheader("⏰ Análisis de Horario Dominante (VIPs)")
             df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
+            df_vips_full["Hora"] = pd.to_datetime(df_vips_full["Hora"], errors="coerce").dt.hour
             df_vips_full = df_vips_full.dropna(subset=["Hora"])
-
+            
             def clasificar_horario(h):
                 if 0 <= h < 6:
                     return "Madrugada"
@@ -104,44 +106,39 @@ if seccion == "👑 Comunidad VIP":
                     return "Tarde"
                 else:
                     return "Noche"
-
-            df_vips_full["Franja"] = df_vips_full["Hora"].apply(clasificar_horario)
-            horario_dominante = (
-                df_vips_full.groupby(["Jugador", "Franja"]).size()
-                .reset_index(name="Cargas")
-                .sort_values(by=["Jugador", "Cargas"], ascending=[True, False])
-                .drop_duplicates("Jugador")
-            )
-            horario_dominante = horario_dominante.merge(
-                df_vips_full.groupby("Jugador")["Fecha"].max().reset_index(name="Última_Carga"), on="Jugador"
-            )
-
-            st.dataframe(horario_dominante)
-
-            st.subheader("📊 VIPs agrupados por franja horaria")
-            st.caption("🕒 Rango horario: Madrugada (00–06), Mañana (06–12), Tarde (12–18), Noche (18–24). Incluye hora más frecuente por jugador.")
-
+            
+            # Calcular hora más frecuente por jugador
             hora_frecuente = (
                 df_vips_full.groupby(["Jugador", "Hora"]).size()
                 .reset_index(name="Frecuencia")
                 .sort_values(by=["Jugador", "Frecuencia"], ascending=[True, False])
                 .drop_duplicates("Jugador")
             )
-            hora_frecuente["Hora"] = hora_frecuente["Hora"].astype(int).astype(str).str.zfill(2) + ":00"
-
-            horario_dominante = horario_dominante.merge(hora_frecuente[["Jugador", "Hora"]], on="Jugador")
-            horario_dominante.rename(columns={"Hora": "Hora_Más_Frecuente"}, inplace=True)
-
+            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["Hora"].astype(int)
+            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["Hora_Más_Frecuente"].astype(str).str.zfill(2) + ":00"
+            hora_frecuente["Franja"] = hora_frecuente["Hora"].apply(clasificar_horario)
+            
+            # Última carga por jugador
+            ultima_carga_horaria = df_vips_full.groupby("Jugador")["Fecha"].max().reset_index(name="Última_Carga")
+            
+            # Unir todo
+            horario_dominante = hora_frecuente.merge(ultima_carga_horaria, on="Jugador")
+            st.dataframe(horario_dominante[["Jugador", "Franja", "Hora_Más_Frecuente", "Última_Carga"]])
+            
+            # --- 4.2 Tabla agrupada por franja horaria ---
+            st.subheader("📊 VIPs agrupados por franja horaria")
+            st.caption("🕒 Rango horario: Madrugada (00–06), Mañana (06–12), Tarde (12–18), Noche (18–24). Incluye hora más frecuente por jugador.")
+            
             agrupado = horario_dominante.groupby("Franja").agg({
                 "Jugador": list,
                 "Jugador": "count"
             }).rename(columns={"Jugador": "Total_VIPs"}).reset_index()
-
+            
             agrupado["Jugadores con hora pico"] = agrupado["Franja"].apply(lambda fr: ", ".join([
                 f"{row['Jugador']} ({row['Hora_Más_Frecuente']})"
                 for _, row in horario_dominante[horario_dominante["Franja"] == fr].iterrows()
             ]))
-
+            
             st.dataframe(agrupado[["Franja", "Total_VIPs", "Jugadores con hora pico"]])
 
 
