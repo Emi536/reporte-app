@@ -20,7 +20,7 @@ def preparar_dataframe(df):
         "límites": "?3",
         "balance antes de operación": "Saldo",
         "fecha": "Fecha",
-        "Tiempo": "Hora",
+        "tiempo": "Hora",
         "iniciador": "UsuarioSistema",
         "del usuario": "Plataforma",
         "sistema": "Admin",
