@@ -73,6 +73,7 @@ if seccion == "👑 Comunidad VIP":
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200)
             vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
 
+
             vip_resumen = df_resumen.reset_index()
             vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
             vip_df = vip_resumen[vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
@@ -124,9 +125,33 @@ if seccion == "👑 Comunidad VIP":
 
             # --- 4.2 Tabla agrupada por franja horaria ---
             st.subheader("📊 VIPs agrupados por franja horaria")
-            agrupado = horario_dominante.groupby("Franja")["Jugador"].apply(list).reset_index()
-            agrupado["Total_VIPs"] = agrupado["Jugador"].apply(len)
-            st.dataframe(agrupado)
+            st.caption("🕒 Rango horario: Madrugada (00–06), Mañana (06–12), Tarde (12–18), Noche (18–24). Incluye hora más frecuente por jugador.")
+
+            # Calcular la hora más frecuente por jugador
+            hora_frecuente = (
+                df_vips_full.groupby(["Jugador", "Hora"]).size()
+                .reset_index(name="Frecuencia")
+                .sort_values(by=["Jugador", "Frecuencia"], ascending=[True, False])
+                .drop_duplicates("Jugador")
+            )
+            hora_frecuente["Hora"] = hora_frecuente["Hora"].astype(int).astype(str).str.zfill(2) + ":00"
+
+            # Combinar con horario_dominante
+            horario_dominante = horario_dominante.merge(hora_frecuente[["Jugador", "Hora"]], on="Jugador")
+            horario_dominante.rename(columns={"Hora": "Hora_Más_Frecuente"}, inplace=True)
+
+            # Agrupar por franja
+            agrupado = horario_dominante.groupby("Franja").agg({
+                "Jugador": list,
+                "Jugador": "count"
+            }).rename(columns={"Jugador": "Total_VIPs"}).reset_index()
+
+            agrupado["Jugadores con hora pico"] = agrupado["Franja"].apply(lambda fr: ", ".join([
+                f"{row['Jugador']} ({row['Hora_Más_Frecuente']})"
+                for _, row in horario_dominante[horario_dominante["Franja"] == fr].iterrows()
+            ]))
+
+            st.dataframe(agrupado[["Franja", "Total_VIPs", "Jugadores con hora pico"]])
 
             # --- 5. Simulación crecimiento mensual ---
             st.subheader("📈 Simulación de Crecimiento Mensual de VIPs")
@@ -198,7 +223,6 @@ elif seccion == "🎰 Comunidad VIP - Eros":
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200, key="vip_list_eros")
             vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
 
-
             vip_resumen = df_resumen.reset_index()
             vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
             vip_df = vip_resumen[vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
@@ -217,4 +241,3 @@ elif seccion == "🎰 Comunidad VIP - Eros":
             df_no_vip = vip_resumen[~vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
             posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
             st.dataframe(posibles_vips)
-
