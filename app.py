@@ -119,4 +119,4 @@ if seccion == "\U0001F451 Comunidad VIP":
             observacion = st.text_area("\U0001F5D2\uFE0F Observaciones (respuesta, bono ofrecido, etc.)")
 
             if st.button("\U0001F4BE Guardar registro de contacto"):
-             st.success(f"Registro guardado para {jugador_contactado}: Contactado = {fue_contactado}, Observación = {observacion}")
+                 st.success(f"Registro guardado para {jugador_contactado}: Contactado = {fue_contactado}, Observación = {observacion}")
