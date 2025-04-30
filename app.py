@@ -25,7 +25,7 @@ def preparar_dataframe(df):
     return df
 
 # --- SECCIÓN: COMUNIDAD VIP ---
-elif seccion == "👑 Comunidad VIP":
+if seccion == "👑 Comunidad VIP":
     st.header("👑 Comunidad VIP - Seguimiento de Jugadores Premium")
 
     archivo = st.file_uploader("📁 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip")
