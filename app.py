@@ -93,6 +93,41 @@ if seccion == "👑 Comunidad VIP":
             posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
             st.dataframe(posibles_vips)
 
+            # --- 4.1 Análisis de Horario Dominante VIPs ---
+            st.subheader("⏰ Análisis de Horario Dominante (VIPs)")
+            df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
+            df_vips_full["Hora"] = pd.to_datetime(df_vips_full["Hora"], errors="coerce").dt.hour
+            df_vips_full = df_vips_full.dropna(subset=["Hora"])
+
+            def clasificar_horario(h):
+                if 0 <= h < 6:
+                    return "Madrugada"
+                elif 6 <= h < 12:
+                    return "Mañana"
+                elif 12 <= h < 18:
+                    return "Tarde"
+                else:
+                    return "Noche"
+
+            df_vips_full["Franja"] = df_vips_full["Hora"].apply(clasificar_horario)
+            horario_dominante = (
+                df_vips_full.groupby(["Jugador", "Franja"]).size()
+                .reset_index(name="Cargas")
+                .sort_values(by=["Jugador", "Cargas"], ascending=[True, False])
+                .drop_duplicates("Jugador")
+            )
+            horario_dominante = horario_dominante.merge(
+                df_vips_full.groupby("Jugador")["Fecha"].max().reset_index(name="Última_Carga"), on="Jugador"
+            )
+
+            st.dataframe(horario_dominante)
+
+            # --- 4.2 Tabla agrupada por franja horaria ---
+            st.subheader("📊 VIPs agrupados por franja horaria")
+            agrupado = horario_dominante.groupby("Franja")["Jugador"].apply(list).reset_index()
+            agrupado["Total_VIPs"] = agrupado["Jugador"].apply(len)
+            st.dataframe(agrupado)
+
             # --- 5. Simulación crecimiento mensual ---
             st.subheader("📈 Simulación de Crecimiento Mensual de VIPs")
             fecha_simulada = st.date_input("Fecha simulada de ingreso de estos posibles VIPs", pd.Timestamp.today())
@@ -162,6 +197,7 @@ elif seccion == "🎰 Comunidad VIP - Eros":
             st.subheader("📥 Lista de jugadores VIP de Eros")
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200, key="vip_list_eros")
             vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
+
 
             vip_resumen = df_resumen.reset_index()
             vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
