@@ -1,76 +1,79 @@
-
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+from io import BytesIO
+import datetime
 
-# 🔐 CONTRASEÑA SIMPLE
-password = st.text_input("🔑 Ingresá la contraseña para acceder:", type="password")
-if password != "casino123":
-    st.warning("Esta app es privada. Ingresá la contraseña correcta para continuar.")
-    st.stop()
+def preparar_dataframe(df):
+    df = df.rename(columns={
+        "operación": "Tipo",
+        "Depositar": "Monto",
+        "Retirar": "Retiro",
+        "Wager": "?2",
+        "Límites": "?3",
+        "Balance antes de operación": "Balance_Inicial",
+        "Jugador": "Jugador",
+        "Fecha": "Fecha",
+        "Hora": "Hora",
+    })
+    return df
 
-# --- FUNCIÓN DE PROCESAMIENTO ---
-def procesar_reporte(df):
-    columnas_esperadas = [
-        "ID", "Tipo", "Monto", "?1", "?2", "?3", "Saldo",
-        "Fecha", "Hora", "UsuarioSistema", "Plataforma", "Admin", "Jugador", "Extra"
-    ]
+# --- SECCIÓN: COMUNIDAD VIP ---
+elif seccion == "👑 Comunidad VIP":
+    st.header("👑 Comunidad VIP - Seguimiento de Jugadores Premium")
 
-    if len(df.columns) != len(columnas_esperadas):
-        st.error(f"❌ El archivo tiene {len(df.columns)} columnas pero se esperaban {len(columnas_esperadas)}.")
-        st.info("Asegurate de estar subiendo un archivo con el formato correcto.")
-        st.stop()
+    archivo = st.file_uploader("📁 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip")
+    if archivo:
+        df = pd.read_excel(archivo) if archivo.name.endswith((".xlsx", ".xls")) else pd.read_csv(archivo)
+        df = preparar_dataframe(df)
 
-    df.columns = columnas_esperadas
+        if df is not None:
+            df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+            df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
+            df["Días sin cargar"] = (pd.Timestamp.now() - df["Fecha"]).dt.days
+            df["Última fecha"] = df.groupby("Jugador")["Fecha"].transform("max")
 
-    df_cargas = df[df["Tipo"] == "in"]
+            df_vip = (
+                df[df["Tipo"] == "in"]
+                .groupby("Jugador")
+                .agg({
+                    "Monto": "sum",
+                    "Fecha": ["count", "max"]
+                })
+            )
+            df_vip.columns = ["Monto_Total", "Cantidad_Cargas", "Última_Carga"]
+            df_vip = df_vip.reset_index()
+            df_vip["Días_sin_cargar"] = (pd.Timestamp.now() - df_vip["Última_Carga"]).dt.days
 
-    top_cantidades = (
-        df_cargas.groupby("Jugador")
-        .agg(Cantidad_Cargas=("Jugador", "count"), Monto_Total_Cargado=("Monto", "sum"))
-        .sort_values(by="Cantidad_Cargas", ascending=False)
-        .head(10)
-        .reset_index()
-    )
+            def calcular_nivel_vip(monto, cantidad):
+                if monto > 100000 and cantidad > 15:
+                    return "VIP Diamante"
+                elif monto > 50000:
+                    return "VIP Oro"
+                elif monto > 20000:
+                    return "VIP Plata"
+                else:
+                    return "Regular"
 
-    top_montos = (
-        df_cargas.groupby("Jugador")
-        .agg(Monto_Total_Cargado=("Monto", "sum"), Cantidad_Cargas=("Jugador", "count"))
-        .sort_values(by="Monto_Total_Cargado", ascending=False)
-        .head(10)
-        .reset_index()
-    )
+            df_vip["Nivel_VIP"] = df_vip.apply(lambda row: calcular_nivel_vip(row["Monto_Total"], row["Cantidad_Cargas"]), axis=1)
 
-    return top_cantidades, top_montos
+            nivel_filtro = st.selectbox("🔍 Filtrar por Nivel VIP", ["Todos"] + sorted(df_vip["Nivel_VIP"].unique().tolist()))
+            if nivel_filtro != "Todos":
+                df_vip = df_vip[df_vip["Nivel_VIP"] == nivel_filtro]
 
-# --- INTERFAZ PRINCIPAL ---
-st.title("📊 Reporte de Cargas del Casino")
+            dias_inactivos = st.slider("📆 Mostrar jugadores con más de X días sin cargar:", 0, 60, 7)
+            df_filtrado = df_vip[df_vip["Días_sin_cargar"] >= dias_inactivos]
 
-archivo = st.file_uploader("📁 Subí tu archivo de reporte (.xlsx, .xls o .csv):", type=["xlsx", "xls", "csv"])
+            st.subheader("📋 Jugadores VIP inactivos")
+            st.dataframe(df_filtrado)
 
-if archivo is not None:
-    try:
-        if archivo.name.endswith(".csv"):
-            df = pd.read_csv(archivo)
+            # --- Descargar Excel ---
+            try:
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df_filtrado.to_excel(writer, sheet_name="VIP Inactivos", index=False)
+                st.download_button("📤 Descargar lista de VIPs inactivos", output.getvalue(), file_name="VIP_inactivos.xlsx")
+            except Exception as e:
+                st.error(f"Error al generar archivo: {e}")
         else:
-            df = pd.read_excel(archivo)
-        st.success("Archivo cargado correctamente ✅")
-
-        top_cant, top_monto = procesar_reporte(df)
-
-        st.subheader("🔢 Top 10 por Cantidad de Cargas")
-        st.dataframe(top_cant)
-
-        st.subheader("💰 Top 10 por Monto Total Cargado")
-        st.dataframe(top_monto)
-
-        excel_writer = pd.ExcelWriter("reporte_casino_resultado.xlsx", engine="xlsxwriter")
-        top_cant.to_excel(excel_writer, sheet_name="Top Cantidad", index=False)
-        top_monto.to_excel(excel_writer, sheet_name="Top Monto", index=False)
-        excel_writer.close()
-
-        with open("reporte_casino_resultado.xlsx", "rb") as file:
-            st.download_button("📥 Descargar Reporte en Excel", file, file_name="Top_Reporte_Casino.xlsx")
-
-    except Exception as e:
-        st.error(f"❌ Error al leer el archivo: {e}")
-        st.stop()
+            st.error("❌ El archivo no tiene el formato esperado.")
