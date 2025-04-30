@@ -89,18 +89,19 @@ if seccion == "👑 Comunidad VIP":
             posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
             st.dataframe(posibles_vips)
 
-            # --- Análisis de franja horaria VIPs ---
+           # --- 4.1 Análisis de franja horaria VIPs ---
             st.subheader("⏰ Segmentación horaria de jugadores VIP")
             st.caption("🕒 Madrugada (00–06), Mañana (06–12), Tarde (12–18), Noche (18–24)")
             
-            # Filtramos el DataFrame original solo con los VIPs que cargaron
+            # 1. Filtramos el DataFrame original solo con los VIPs que cargaron
             df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
             
-            # Aseguramos que Hora esté en formato datetime y extraemos la hora
-            df_vips_full["Hora"] = pd.to_datetime(df_vips_full["Hora"], format="%H:%M:%S", errors="coerce").dt.hour
-            df_vips_full = df_vips_full.dropna(subset=["Hora"])
+            # 2. Aseguramos que la columna Hora esté bien parseada desde el string "Tiempo" (que ya fue renombrado a "Hora")
+            df_vips_full["HoraReal"] = pd.to_datetime(df_vips_full["Hora"], format="%H:%M:%S", errors="coerce")
+            df_vips_full["HoraEntera"] = df_vips_full["HoraReal"].dt.hour
+            df_vips_full = df_vips_full.dropna(subset=["HoraEntera"])
             
-            # Clasificación por franja
+            # 3. Clasificación por franja horaria
             def clasificar_franja(h):
                 if 0 <= h < 6:
                     return "Madrugada"
@@ -111,9 +112,9 @@ if seccion == "👑 Comunidad VIP":
                 else:
                     return "Noche"
             
-            df_vips_full["Franja"] = df_vips_full["Hora"].apply(clasificar_franja)
+            df_vips_full["Franja"] = df_vips_full["HoraEntera"].apply(clasificar_franja)
             
-            # 1. Detectamos la franja dominante por jugador
+            # 4. Detectamos la franja dominante por jugador
             franja_dominante = (
                 df_vips_full.groupby(["Jugador", "Franja"]).size()
                 .reset_index(name="Cargas")
@@ -121,23 +122,22 @@ if seccion == "👑 Comunidad VIP":
                 .drop_duplicates("Jugador")
             )
             
-            # 2. Detectamos la hora más frecuente de cada jugador
+            # 5. Detectamos la hora más frecuente de cada jugador
             hora_frecuente = (
-                df_vips_full.groupby(["Jugador", "Hora"]).size()
+                df_vips_full.groupby(["Jugador", "HoraEntera"]).size()
                 .reset_index(name="Frecuencia")
                 .sort_values(by=["Jugador", "Frecuencia"], ascending=[True, False])
                 .drop_duplicates("Jugador")
             )
-            hora_frecuente["Hora"] = hora_frecuente["Hora"].astype(int).astype(str).str.zfill(2) + ":00"
+            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["HoraEntera"].astype(int).astype(str).str.zfill(2) + ":00"
             
-            # 3. Combinamos franja y hora
-            patron_horario = franja_dominante.merge(hora_frecuente[["Jugador", "Hora"]], on="Jugador")
-            patron_horario.rename(columns={"Hora": "Hora_Más_Frecuente"}, inplace=True)
+            # 6. Combinamos franja y hora
+            patron_horario = franja_dominante.merge(hora_frecuente[["Jugador", "Hora_Más_Frecuente"]], on="Jugador")
             
-            # 4. Mostramos tabla final
+            # 7. Mostramos tabla final
             st.dataframe(patron_horario)
             
-            # 5. Agrupamos por franja con jugadores y hora pico
+            # 8. Agrupamos por franja con jugadores y hora pico
             st.subheader("📊 VIPs agrupados por franja horaria")
             tabla_franjas = patron_horario.groupby("Franja").agg({
                 "Jugador": list,
@@ -150,6 +150,7 @@ if seccion == "👑 Comunidad VIP":
             ]))
             
             st.dataframe(tabla_franjas[["Franja", "Total_VIPs", "Jugadores con hora pico"]])
+
 
 elif seccion == "🎰 Comunidad VIP - Eros":
     st.header("🎰 Comunidad VIP - Eros")
