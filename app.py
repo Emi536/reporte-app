@@ -96,9 +96,9 @@ if seccion == "👑 Comunidad VIP":
             df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
             
             # 2. Aseguramos que la columna Hora esté bien parseada desde el string "Tiempo" (que ya fue renombrado a "Hora")
-            df_vips_full["HoraReal"] = pd.to_datetime(df_vips_full["Hora"], format="%H:%M:%S", errors="coerce")
+            df_vips_full["HoraReal"] = pd.to_datetime(df_vips_full["Hora"], errors="coerce")
             df_vips_full["HoraEntera"] = df_vips_full["HoraReal"].dt.hour
-            df_vips_full = df_vips_full.dropna(subset=["HoraEntera"])
+
             
             # 3. Clasificación por franja horaria
             def clasificar_franja(h):
