@@ -4,6 +4,10 @@ import plotly.express as px
 from io import BytesIO
 import datetime
 
+st.set_page_config(page_title="VIPS", layout="wide")
+st.markdown("<h1 style='text-align: center; color:#F44336;'>Player Metrics</h1>", unsafe_allow_html=True)
+
+
 seccion = st.sidebar.radio("Seleccioná una sección:", ["👑 Comunidad VIP"])
 
 def preparar_dataframe(df):
