@@ -114,9 +114,9 @@ if seccion == "👑 Comunidad VIP":
                 .sort_values(by=["Jugador", "Frecuencia"], ascending=[True, False])
                 .drop_duplicates("Jugador")
             )
-            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["Hora"].astype(int)
-            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["Hora_Más_Frecuente"].astype(str).str.zfill(2) + ":00"
             hora_frecuente["Franja"] = hora_frecuente["Hora"].apply(clasificar_horario)
+            hora_frecuente["Hora_Más_Frecuente"] = hora_frecuente["Hora"].astype(int).astype(str).str.zfill(2) + ":00"
+
             
             # Última carga por jugador
             ultima_carga_horaria = df_vips_full.groupby("Jugador")["Fecha"].max().reset_index(name="Última_Carga")
