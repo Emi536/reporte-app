@@ -38,6 +38,7 @@ if seccion == "👑 Comunidad VIP":
 
         if df is not None:
             df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+            df["Hora"] = pd.to_datetime(df["Hora"], format="%H:%M:%S", errors="coerce").dt.hour
             df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
             df["Jugador"] = df["Jugador"].astype(str).str.strip()
             df["Jugador_normalizado"] = df["Jugador"].str.lower()
@@ -55,7 +56,6 @@ if seccion == "👑 Comunidad VIP":
             cargas_wagger = df[df["Fuente"] == "WAGGER"].groupby("Jugador")["Monto"].sum().rename("WAGGER")
             cantidad_cargas = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Monto"].count().rename("Cantidad_Cargas")
             ultima_carga = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Fecha"].max().rename("Última_Carga")
-            ultima_carga = pd.to_datetime(ultima_carga, errors="coerce")
             dias_sin_cargar = (pd.Timestamp.now() - ultima_carga).dt.days.rename("Días_sin_cargar")
 
             df_resumen = pd.concat([cargas_hl, cargas_wagger, cantidad_cargas, ultima_carga, dias_sin_cargar], axis=1).fillna(0)
@@ -69,8 +69,6 @@ if seccion == "👑 Comunidad VIP":
             st.subheader("📥 Lista de jugadores VIP actual")
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200)
             vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
-
-            df["Hora"] = pd.to_datetime(df["Hora"], errors="coerce").dt.hour
 
             vip_resumen = df_resumen.reset_index()
             vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
@@ -93,9 +91,7 @@ if seccion == "👑 Comunidad VIP":
 
             st.subheader("⏰ Análisis de Horario Dominante (VIPs)")
             df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
-
             df_vips_full = df_vips_full.dropna(subset=["Hora"])
-            df_vips_full = df_vips_full[df_vips_full["Hora"].between(0, 23)]
 
             def clasificar_horario(h):
                 if 0 <= h < 6:
@@ -108,7 +104,6 @@ if seccion == "👑 Comunidad VIP":
                     return "Noche"
 
             df_vips_full["Franja"] = df_vips_full["Hora"].apply(clasificar_horario)
-
             horario_dominante = (
                 df_vips_full.groupby(["Jugador", "Franja"]).size()
                 .reset_index(name="Cargas")
@@ -136,6 +131,7 @@ if seccion == "👑 Comunidad VIP":
             horario_dominante.rename(columns={"Hora": "Hora_Más_Frecuente"}, inplace=True)
 
             agrupado = horario_dominante.groupby("Franja").agg({
+                "Jugador": list,
                 "Jugador": "count"
             }).rename(columns={"Jugador": "Total_VIPs"}).reset_index()
 
@@ -146,7 +142,6 @@ if seccion == "👑 Comunidad VIP":
 
             st.dataframe(agrupado[["Franja", "Total_VIPs", "Jugadores con hora pico"]])
 
-            # --- 5. Simulación crecimiento mensual ---
             st.subheader("📈 Simulación de Crecimiento Mensual de VIPs")
             fecha_simulada = st.date_input("Fecha simulada de ingreso de estos posibles VIPs", pd.Timestamp.today())
             posibles_vips["Fecha_Ingreso"] = pd.to_datetime(fecha_simulada)
@@ -157,7 +152,6 @@ if seccion == "👑 Comunidad VIP":
                 graf_vip = px.bar(crecimiento, x="Mes", y="Nuevos_VIPs", title="Crecimiento estimado de la comunidad VIP")
                 st.plotly_chart(graf_vip, use_container_width=True)
 
-            # --- 6. Simulador de recompensa ---
             st.subheader("🎁 Simulador de Recompensa VIP")
             jugador_input = st.selectbox("Seleccioná un jugador para simular", df_resumen.index)
             if jugador_input in df_resumen.index:
@@ -165,7 +159,6 @@ if seccion == "👑 Comunidad VIP":
                 bonus_simulado = monto_total * 1.5
                 st.info(f"Si {jugador_input} fuera VIP con 150% de bono, recibiría aproximadamente: **${bonus_simulado:,.0f}**")
 
-            # --- 7. Registro manual de contacto ---
             st.subheader("📒 Registro de contacto (manual)")
             jugador_contactado = st.selectbox("Seleccioná un jugador VIP contactado", vip_df["Jugador"].unique())
             fue_contactado = st.checkbox("✅ Fue contactado")
