@@ -4,6 +4,8 @@ import plotly.express as px
 from io import BytesIO
 import datetime
 
+seccion = st.sidebar.radio("Seleccioná una sección:", ["👑 Comunidad VIP"])
+
 def preparar_dataframe(df):
     df = df.rename(columns={
         "operación": "Tipo",
