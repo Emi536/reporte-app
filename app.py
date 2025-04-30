@@ -29,7 +29,7 @@ def preparar_dataframe(df):
     })
     return df
 
-elif seccion == "👑 Comunidad VIP":
+if seccion == "👑 Comunidad VIP":
     st.header("👑 Comunidad VIP - Gestión y Expansión")
 
     archivo = st.file_uploader("📁 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip_exp")
