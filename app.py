@@ -161,7 +161,7 @@ elif seccion == "🎰 Comunidad VIP - Eros":
 
             st.subheader("📥 Lista de jugadores VIP de Eros")
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200, key="vip_list_eros")
-          vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
+            vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
 
             vip_resumen = df_resumen.reset_index()
             vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
