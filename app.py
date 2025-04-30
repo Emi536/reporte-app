@@ -10,6 +10,7 @@ st.markdown("<h1 style='text-align: center; color:#F44336;'>Player Metrics</h1>"
 
 seccion = st.sidebar.radio("Seleccioná una sección:", ["👑 Comunidad VIP"])
 
+# --- FUNCIONES ---
 def preparar_dataframe(df):
     df = df.rename(columns={
         "operación": "Tipo",
@@ -17,10 +18,14 @@ def preparar_dataframe(df):
         "Retirar": "Retiro",
         "Wager": "?2",
         "Límites": "?3",
-        "Balance antes de operación": "Balance_Inicial",
-        "Jugador": "Jugador",
+        "Balance antes de operación": "Saldo",
         "Fecha": "Fecha",
-        "Hora": "Hora",
+        "Tiempo": "Hora",
+        "Iniciador": "UsuarioSistema",
+        "Del usuario": "Plataforma",
+        "Sistema": "Admin",
+        "Al usuario": "Jugador",
+        "IP": "Extra"
     })
     return df
 
