@@ -7,8 +7,7 @@ import datetime
 st.set_page_config(page_title="VIPS", layout="wide")
 st.markdown("<h1 style='text-align: center; color:#F44336;'>Player Metrics</h1>", unsafe_allow_html=True)
 
-
-seccion = st.sidebar.radio("Seleccioná una sección:", ["👑 Comunidad VIP"])
+seccion = st.sidebar.radio("Seleccioná una sección:", ["\U0001F451 Comunidad VIP"])
 
 # --- FUNCIONES ---
 def preparar_dataframe(df):
@@ -29,10 +28,10 @@ def preparar_dataframe(df):
     })
     return df
 
-if seccion == "👑 Comunidad VIP":
-    st.header("👑 Comunidad VIP - Gestión y Expansión")
+if seccion == "\U0001F451 Comunidad VIP":
+    st.header("\U0001F451 Comunidad VIP - Gestión y Expansión")
 
-    archivo = st.file_uploader("📁 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip_exp")
+    archivo = st.file_uploader("\U0001F4C1 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip_exp")
     if archivo:
         df = pd.read_excel(archivo) if archivo.name.endswith((".xlsx", ".xls")) else pd.read_csv(archivo)
         df = preparar_dataframe(df)
@@ -41,16 +40,14 @@ if seccion == "👑 Comunidad VIP":
             df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
             df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
             df["Jugador"] = df["Jugador"].astype(str).str.strip()
-            df["Días sin cargar"] = (pd.Timestamp.now() - df["Fecha"]).dt.days
+            df["Jugador_normalizado"] = df["Jugador"].str.lower()
 
-            # --- 1. Cargar lista de VIPs desde archivo adicional o lista integrada ---
-            st.subheader("📥 Lista de jugadores VIP actual")
+            # --- 1. Cargar lista de VIPs desde text_area ---
+            st.subheader("\U0001F4E5 Lista de jugadores VIP actual")
             lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200)
             vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
 
-            df["Jugador_normalizado"] = df["Jugador"].str.lower()
-
-            # --- 2. Tabla de jugadores VIP actuales (para controlar actividad e inactividad) ---
+            # --- 2. Actividad de jugadores VIP ---
             vip_df = df[df["Jugador_normalizado"].isin(vips_actuales)]
             resumen_vips = (
                 vip_df.groupby("Jugador")
@@ -61,7 +58,7 @@ if seccion == "👑 Comunidad VIP":
             )
             resumen_vips["Días_sin_cargar"] = (pd.Timestamp.now() - resumen_vips["Última_Carga"]).dt.days
 
-            st.subheader("📋 Actividad de Jugadores VIP")
+            st.subheader("\U0001F4CB Actividad de Jugadores VIP")
             dias_filtro = st.slider("Mostrar VIPs con más de X días sin cargar", 0, 30, 7)
             vip_filtrados = resumen_vips[resumen_vips["Días_sin_cargar"] >= dias_filtro]
             st.dataframe(vip_filtrados)
@@ -70,68 +67,49 @@ if seccion == "👑 Comunidad VIP":
             output = BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 vip_filtrados.to_excel(writer, index=False)
-            st.download_button("📤 Descargar VIPs inactivos", output.getvalue(), file_name="vips_inactivos.xlsx")
+            st.download_button("\U0001F4E4 Descargar VIPs inactivos", output.getvalue(), file_name="vips_inactivos.xlsx")
 
-            st.subheader("🆕 Posibles nuevos VIPs (no registrados)")
-            
-            # 1. Filtrar jugadores que NO están en la lista de VIPs actuales
+            # --- 4. Posibles nuevos VIPs ---
+            st.subheader("\U0001F195 Posibles nuevos VIPs (no registrados)")
             df_no_vip = df[~df["Jugador_normalizado"].isin(vips_actuales)]
-            
-            # 2. Agrupar por jugador para obtener sus métricas
             posibles_vips = (
                 df_no_vip.groupby("Jugador")
-                .agg(
-                    Monto_Total=("Monto", "sum"),
-                    Cantidad_Cargas=("Jugador", "count"),
-                    Última_Carga=("Fecha", "max")
-                )
+                .agg(Monto_Total=("Monto", "sum"),
+                     Cantidad_Cargas=("Jugador", "count"),
+                     Última_Carga=("Fecha", "max"))
                 .reset_index()
             )
-            
-            # 3. Filtrar por criterios: alto monto o alta frecuencia
             posibles_vips = posibles_vips[
                 (posibles_vips["Monto_Total"] > 10000) |
                 (posibles_vips["Cantidad_Cargas"] >= 5)
             ]
-            
-            # 4. Calcular días desde última carga
-            posibles_vips["Días_sin_cargar"] = (
-                pd.Timestamp.now() - posibles_vips["Última_Carga"]
-            ).dt.days
-            
-            # 5. Mostrar tabla
+            posibles_vips["Días_sin_cargar"] = (pd.Timestamp.now() - posibles_vips["Última_Carga"]).dt.days
             st.dataframe(posibles_vips)
 
-            # --- 5. Visualización de crecimiento mensual de VIPs (simulación manual) ---
-            st.subheader("📈 Simulación de Crecimiento Mensual de VIPs")
-            
+            # --- 5. Simulación crecimiento mensual ---
+            st.subheader("\U0001F4C8 Simulación de Crecimiento Mensual de VIPs")
             fecha_simulada = st.date_input("Fecha simulada de ingreso de estos posibles VIPs", pd.Timestamp.today())
-            
-            # Crear columna con misma fecha para todos
             posibles_vips["Fecha_Ingreso"] = pd.to_datetime(fecha_simulada)
-            
-            # Convertir a periodo mensual correctamente
             posibles_vips["Mes"] = posibles_vips["Fecha_Ingreso"].dt.to_period("M")
-            
-            # Agrupar y graficar
             crecimiento = posibles_vips.groupby("Mes").size().reset_index(name="Nuevos_VIPs")
+            crecimiento["Mes"] = crecimiento["Mes"].astype(str)
             if not crecimiento.empty:
                 graf_vip = px.bar(crecimiento, x="Mes", y="Nuevos_VIPs", title="Crecimiento estimado de la comunidad VIP")
                 st.plotly_chart(graf_vip, use_container_width=True)
-            # --- 6. Simulador de Recompensa VIP ---
-            st.subheader("🎁 Simulador de Recompensa VIP")
+
+            # --- 6. Simulador de recompensa ---
+            st.subheader("\U0001F381 Simulador de Recompensa VIP")
             jugador_input = st.selectbox("Seleccioná un jugador para simular", df["Jugador"].unique())
             monto_total = df[df["Jugador"] == jugador_input]["Monto"].sum()
             bonus_simulado = monto_total * 1.5
             st.info(f"Si {jugador_input} fuera VIP con 150% de bono, recibiría aproximadamente: **${bonus_simulado:,.0f}**")
 
-            # --- 7. Sistema de contacto manual y observaciones (en preparación) ---
-            st.subheader("📒 Registro de contacto (manual)")
+            # --- 7. Registro manual de contacto ---
+            st.subheader("\U0001F4D2 Registro de contacto (manual)")
             jugador_contactado = st.selectbox("Seleccioná un jugador VIP contactado", resumen_vips["Jugador"].unique())
-            fue_contactado = st.checkbox("✅ Fue contactado")
-            observacion = st.text_area("🗒️ Observaciones (respuesta, bono ofrecido, etc.)")
+            fue_contactado = st.checkbox("\u2705 Fue contactado")
+            observacion = st.text_area("\U0001F5D2\uFE0F Observaciones (respuesta, bono ofrecido, etc.)")
 
-            if st.button("💾 Guardar registro de contacto"):
+            if st.button("\U0001F4BE Guardar registro de contacto"):
                 st.success(f"Registro guardado para {jugador_contactado}: Contactado = {fue_contactado}, Observación = {observacion}")
-                # En futuro: se puede conectar con Google Sheets o guardar localmente
-
+                # En futuro: guardar en Google Sheets o base de datos
