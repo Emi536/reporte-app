@@ -72,21 +72,34 @@ if seccion == "👑 Comunidad VIP":
                 vip_filtrados.to_excel(writer, index=False)
             st.download_button("📤 Descargar VIPs inactivos", output.getvalue(), file_name="vips_inactivos.xlsx")
 
-            # --- 4. Detectar nuevos posibles VIPs ---
             st.subheader("🆕 Posibles nuevos VIPs (no registrados)")
+            
+            # 1. Filtrar jugadores que NO están en la lista de VIPs actuales
             df_no_vip = df[~df["Jugador_normalizado"].isin(vips_actuales)]
+            
+            # 2. Agrupar por jugador para obtener sus métricas
             posibles_vips = (
                 df_no_vip.groupby("Jugador")
-                .agg(Monto_Total=("Monto", "sum"),
-                     Cantidad_Cargas=("Jugador", "count"),
-                     Última_Carga=("Fecha", "max"))
+                .agg(
+                    Monto_Total=("Monto", "sum"),
+                    Cantidad_Cargas=("Jugador", "count"),
+                    Última_Carga=("Fecha", "max")
+                )
                 .reset_index()
             )
+            
+            # 3. Filtrar por criterios: alto monto o alta frecuencia
             posibles_vips = posibles_vips[
                 (posibles_vips["Monto_Total"] > 10000) |
                 (posibles_vips["Cantidad_Cargas"] >= 5)
             ]
-            posibles_vips["Días_sin_cargar"] = (pd.Timestamp.now() - posibles_vips["Última_Carga"]).dt.days
+            
+            # 4. Calcular días desde última carga
+            posibles_vips["Días_sin_cargar"] = (
+                pd.Timestamp.now() - posibles_vips["Última_Carga"]
+            ).dt.days
+            
+            # 5. Mostrar tabla
             st.dataframe(posibles_vips)
 
             # --- 5. Visualización de crecimiento mensual de VIPs (si tenés fechas de ingreso) ---
