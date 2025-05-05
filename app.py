@@ -48,7 +48,11 @@ def analizar_participacion(df_reporte, vip_list, bonos):
         else:
             comunidad = ""
 
-        bonos_del_dia = bonos[(bonos['Fecha'] == fecha.strftime("%d/%m/%Y")) & (bonos['Comunidad'].str.lower() == comunidad.lower())]
+        bonos_del_dia = bonos[
+            (bonos['Fecha'] == fecha.strftime("%d/%m/%Y")) &
+            (bonos['Comunidad'].str.lower() == comunidad.lower())
+        ]
+
         participo = False
         bono_usado = ""
 
@@ -73,12 +77,17 @@ def analizar_participacion(df_reporte, vip_list, bonos):
 
             if h_ini <= hora <= h_fin:
                 if bono_tipo == "primera carga":
-                    if min_mejorado and monto >= min_mejorado:
-                        participo = True
-                        bono_usado = f"{b['Bono % mejorado']} ({comunidad})"
-                    elif monto >= min_carga:
-                        participo = True
-                        bono_usado = f"{b['Bono % base']} ({comunidad})"
+                    cargas_dia = df_reporte[
+                        (df_reporte['Al usuario'] == usuario) &
+                        (df_reporte['Fecha'].dt.date == fecha)
+                    ]
+                    if not cargas_dia.empty and row.equals(cargas_dia.iloc[0]):
+                        if min_mejorado and monto >= min_mejorado:
+                            participo = True
+                            bono_usado = f"{b['Bono % mejorado']} ({comunidad})"
+                        elif monto >= min_carga:
+                            participo = True
+                            bono_usado = f"{b['Bono % base']} ({comunidad})"
                 else:
                     if monto >= min_carga:
                         participo = True
@@ -130,4 +139,3 @@ if archivo:
         st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
     else:
         st.warning("⚠️ No se encontraron jugadores VIP activos o no coincidieron los criterios del bono.")
-
