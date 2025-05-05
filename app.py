@@ -32,9 +32,8 @@ def analizar_participacion(df_reporte, vip_list, bonos):
 
     resultados = []
     df.sort_values(by=['Del usuario', 'Fecha', 'Hora'], inplace=True)
-    primera_carga = df.groupby(['Del usuario', 'Fecha']).first().reset_index()
 
-    for _, row in primera_carga.iterrows():
+    for _, row in df.iterrows():
         usuario = row['Del usuario']
         hora = row['Hora']
         monto = row['Depositar']
@@ -48,22 +47,23 @@ def analizar_participacion(df_reporte, vip_list, bonos):
             h_ini = int(b['Hora inicio'].split(":")[0])
             h_fin = int(b['Hora fin'].split(":")[0])
             min_carga = int(b['Mínimo carga']) if b['Mínimo carga'] else 0
+            min_mejorado = int(b['Mínimo mejorado']) if 'Mínimo mejorado' in b and b['Mínimo mejorado'] else None
             bono_tipo = b.get('Tipo bono', '').lower()
 
             if h_ini <= hora <= h_fin:
                 if bono_tipo == "primera carga":
-                    if monto >= min_carga:
-                        participo = True
-                        bono_usado = f"{b['Bono % mejorado']} (Primera carga)"
-                    else:
-                        participo = True
-                        bono_usado = f"{b['Bono % base']} (Primera carga)"
-                    break
+                    cargas_dia = df[(df['Del usuario'] == usuario) & (df['Fecha'].dt.date == fecha)]
+                    if row.equals(cargas_dia.iloc[0]):
+                        if min_mejorado and monto >= min_mejorado:
+                            participo = True
+                            bono_usado = f"{b['Bono % mejorado']} (Primera carga mejorada)"
+                        elif monto >= min_carga:
+                            participo = True
+                            bono_usado = f"{b['Bono % base']} (Primera carga)"
                 else:
                     if monto >= min_carga:
                         participo = True
                         bono_usado = f"{b['Bono %']} ({b['Comunidad']})"
-                        break
 
         resultados.append({
             "Fecha": fecha,
@@ -107,5 +107,4 @@ if archivo:
 
     # --- DESCARGA CSV ---
     st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
-
 
