@@ -1,10 +1,5 @@
 streamlit
+gspread
 pandas
-matplotlib
 openpyxl
-xlsxwriter
-xlrd
-plotly
-gspread 
-oauth2client
-pytz
+google-auth
