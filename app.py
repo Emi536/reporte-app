@@ -60,14 +60,13 @@ def analizar_participacion(df_reporte, vip_list, bonos):
 
             if h_ini <= hora <= h_fin:
                 if bono_tipo == "primera carga":
-                    cargas_dia = df_reporte[(df_reporte['Al usuario'] == usuario) & (df_reporte['Fecha'].dt.date == fecha)]
-                    if row.equals(cargas_dia.iloc[0]):
-                        if min_mejorado and monto >= min_mejorado:
-                            participo = True
-                            bono_usado = f"{b['Bono % mejorado']} (Primera carga mejorada)"
-                        elif monto >= min_carga:
-                            participo = True
-                            bono_usado = f"{b['Bono % base']} (Primera carga)"
+                    if min_mejorado and monto >= min_mejorado:
+                        participo = True
+                        bono_usado = f"{b['Bono % mejorado']} ({comunidad})"
+                    elif monto >= min_carga:
+                        participo = True
+                        bono_usado = f"{b['Bono % base']} ({comunidad})"
+
                 else:
                     if monto >= min_carga:
                         participo = True
