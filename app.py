@@ -26,20 +26,28 @@ def cargar_data():
     return vip_list, bonos
 
 def analizar_participacion(df_reporte, vip_list, bonos):
-    df = df_reporte[df_reporte['Del usuario'].isin(vip_list['usuario'])].copy()
-    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-    df['Hora'] = pd.to_datetime(df['Tiempo'], format="%H:%M:%S", errors='coerce').dt.hour
+    df_reporte['Fecha'] = pd.to_datetime(df_reporte['Fecha'], errors='coerce')
+    df_reporte['Hora'] = pd.to_datetime(df_reporte['Tiempo'], format="%H:%M:%S", errors='coerce').dt.hour
+    df_reporte = df_reporte.dropna(subset=['Fecha', 'Hora'])
 
     resultados = []
-    df.sort_values(by=['Del usuario', 'Fecha', 'Hora'], inplace=True)
+    df_reporte.sort_values(by=['Al usuario', 'Fecha', 'Hora'], inplace=True)
 
-    for _, row in df.iterrows():
-        usuario = row['Del usuario']
+    for _, row in df_reporte.iterrows():
+        usuario = row['Al usuario']
+        del_usuario = row['Del usuario']
         hora = row['Hora']
         monto = row['Depositar']
         fecha = row['Fecha'].date()
 
-        bonos_del_dia = bonos[bonos['Fecha'] == fecha.strftime("%d/%m/%Y")]
+        if "Fenix" in del_usuario:
+            comunidad = "Fenix"
+        elif "Eros" in del_usuario:
+            comunidad = "Eros"
+        else:
+            comunidad = ""
+
+        bonos_del_dia = bonos[(bonos['Fecha'] == fecha.strftime("%d/%m/%Y")) & (bonos['Comunidad'].str.lower() == comunidad.lower())]
         participo = False
         bono_usado = ""
 
@@ -52,7 +60,7 @@ def analizar_participacion(df_reporte, vip_list, bonos):
 
             if h_ini <= hora <= h_fin:
                 if bono_tipo == "primera carga":
-                    cargas_dia = df[(df['Del usuario'] == usuario) & (df['Fecha'].dt.date == fecha)]
+                    cargas_dia = df_reporte[(df_reporte['Al usuario'] == usuario) & (df_reporte['Fecha'].dt.date == fecha)]
                     if row.equals(cargas_dia.iloc[0]):
                         if min_mejorado and monto >= min_mejorado:
                             participo = True
