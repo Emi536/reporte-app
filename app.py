@@ -93,7 +93,6 @@ def analizar_participacion(df_reporte, vip_list, bonos):
             "Participó": "✅" if participo else "❌"
         })
 
-
     return pd.DataFrame(resultados)
 
 # --- UI: SUBIDA DE REPORTE ---
@@ -131,3 +130,4 @@ if archivo:
         st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
     else:
         st.warning("⚠️ No se encontraron jugadores VIP activos o no coincidieron los criterios del bono.")
+
