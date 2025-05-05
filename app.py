@@ -6,7 +6,7 @@ from google.oauth2.service_account import Credentials
 
 # --- CONFIGURACIÓN DE LA APP ---
 st.set_page_config(page_title="Análisis VIP", layout="wide")
-st.title("🎰 Análisis Diario de Actividad VIP")
+st.title("🌻 Análisis Diario de Actividad VIP")
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -71,7 +71,7 @@ def analizar_participacion(df_reporte, vip_list, bonos):
                 else:
                     if monto >= min_carga:
                         participo = True
-                        bono_usado = f"{b['Bono %']} ({b['Comunidad']})"
+                        bono_usado = f"{b['Bono % base']} ({b['Comunidad']})"
 
         resultados.append({
             "Fecha": fecha,
