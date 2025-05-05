@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Análisis VIP", layout="wide")
 st.title("🎰 Análisis Diario de Actividad VIP")
 
-# --- CONEXIÓN A GOOGLE SHEETS CON ST.SECRETS ---
+# --- CONEXIÓN A GOOGLE SHEETS ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 gc = gspread.authorize(credentials)
@@ -87,6 +87,25 @@ if archivo:
     st.success("✅ Análisis completo. Resultados:")
     st.dataframe(df_resultado)
 
-    # Descargar CSV
+    # --- GUARDADO EN LA HOJA DE ACTIVIDAD ---
+    datos_guardar = [df_resultado.columns.tolist()] + df_resultado.values.tolist()
+    hoja_actividad.clear()
+    hoja_actividad.update("A1", datos_guardar)
+    st.success("📊 Los resultados fueron guardados en la hoja 'actividad_diaria_vip'.")
+
+    # --- GRÁFICO DE PARTICIPACIÓN ---
+    st.subheader("📊 Participación de los VIPs en el día")
+    participacion_count = df_resultado["Participó"].value_counts().reset_index()
+    participacion_count.columns = ["Resultado", "Cantidad"]
+    st.bar_chart(participacion_count.set_index("Resultado"))
+
+    # --- FILTRO POR USUARIO ---
+    st.subheader("🔎 Filtrar actividad por jugador")
+    jugador_seleccionado = st.selectbox("Elegí un jugador:", options=df_resultado["Usuario"].unique())
+    filtrado = df_resultado[df_resultado["Usuario"] == jugador_seleccionado]
+    st.dataframe(filtrado)
+
+    # --- DESCARGA CSV ---
     st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
+
 
