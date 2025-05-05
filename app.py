@@ -85,13 +85,14 @@ def analizar_participacion(df_reporte, vip_list, bonos):
                         bono_usado = f"{b['Bono % base']} ({comunidad})"
 
         resultados.append({
-            "Fecha": fecha,
+            "Fecha": fecha.strftime("%d/%m/%Y"),
             "Usuario": usuario,
             "Monto": monto,
             "Hora": hora,
             "Bono Usado": bono_usado if participo else "No",
             "Participó": "✅" if participo else "❌"
         })
+
 
     return pd.DataFrame(resultados)
 
