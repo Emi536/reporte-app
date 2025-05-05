@@ -1,208 +1,92 @@
-def preparar_dataframe(df):
-    # Normalizar columnas: eliminar espacios, pasar a minúsculas
-    df.columns = df.columns.str.strip().str.lower()
+import streamlit as st
+import pandas as pd
+import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
-    # Crear un diccionario flexible que funcione aunque haya errores de codificación
-    rename_dict = {
-        "operación": "Tipo",
-        "depositar": "Monto",
-        "retirar": "Retiro",
-        "wager": "?2",
-        "límites": "?3",
-        "balance antes de operación": "Saldo",
-        "fecha": "Fecha",
-        "tiempo": "Hora",  # <-- esta es clave
-        "iniciador": "UsuarioSistema",
-        "del usuario": "Plataforma",
-        "sistema": "Admin",
-        "al usuario": "Jugador",
-        "ip": "Extra"
-    }
-    st.write("Columnas disponibles:", df.columns.tolist())
+# --- CONFIGURACIÓN DE LA APP ---
+st.set_page_config(page_title="Análisis VIP", layout="wide")
+st.title("🎰 Análisis Diario de Actividad VIP")
 
-    # Renombrar solo si la clave existe
-    df = df.rename(columns={col: rename_dict[col] for col in df.columns if col in rename_dict})
-    return df
+# --- CONEXIÓN A GOOGLE SHEETS CON ST.SECRETS ---
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+gc = gspread.authorize(credentials)
+sh = gc.open("seguimiento_vip")
 
-if seccion == "👑 Comunidad VIP":
-    st.header("👑 Comunidad VIP - Gestión y Expansión")
+# --- HOJAS ---
+hoja_vips = sh.worksheet("vip_list")
+hoja_bonos = sh.worksheet("bonos_ofrecidos")
+hoja_actividad = sh.worksheet("actividad_diaria_vip")
 
-    archivo = st.file_uploader("📁 Subí tu archivo de cargas recientes:", type=["xlsx", "xls", "csv"], key="vip_exp")
-    if archivo:
-        df = pd.read_excel(archivo) if archivo.name.endswith((".xlsx", ".xls")) else pd.read_csv(archivo)
-        df = preparar_dataframe(df)
+# --- FUNCIONES ---
+def cargar_data():
+    vip_list = pd.DataFrame(hoja_vips.get_all_records())
+    bonos = pd.DataFrame(hoja_bonos.get_all_records())
+    return vip_list, bonos
 
-        if df is not None:
-            df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-            if "Hora" in df.columns:
-                df["Hora"] = pd.to_datetime(df["Hora"], format="%H:%M:%S", errors="coerce").dt.time
-            else:
-                st.error("❌ La columna 'Hora' no se encuentra en el archivo cargado.")
-                st.stop()
+def analizar_participacion(df_reporte, vip_list, bonos):
+    df = df_reporte[df_reporte['Del usuario'].isin(vip_list['usuario'])].copy()
+    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+    df['Hora'] = pd.to_datetime(df['Tiempo'], format="%H:%M:%S", errors='coerce').dt.hour
 
-            df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
-            df["Jugador"] = df["Jugador"].astype(str).str.strip()
-            df["Jugador_normalizado"] = df["Jugador"].str.lower()
-            df["Plataforma"] = df["Plataforma"].astype(str).str.strip()
-            df = df[df["Tipo"] == "in"]
+    resultados = []
+    df.sort_values(by=['Del usuario', 'Fecha', 'Hora'], inplace=True)
+    primera_carga = df.groupby(['Del usuario', 'Fecha']).first().reset_index()
 
-            hl_fuente = "hl_casinofenix"
-            salas_wagger = {
-                "Fenix_Wagger100", "Fenix_Wagger40", "Fenix_Wagger30",
-                "Fenix_Wagger50", "Fenix_Wagger150", "Fenix_Wagger200"
-            }
-            df["Fuente"] = df["Plataforma"].apply(lambda x: "HL" if x == hl_fuente else ("WAGGER" if x in salas_wagger else "OTRO"))
+    for _, row in primera_carga.iterrows():
+        usuario = row['Del usuario']
+        hora = row['Hora']
+        monto = row['Depositar']
+        fecha = row['Fecha'].date()
 
-            cargas_hl = df[df["Fuente"] == "HL"].groupby("Jugador")["Monto"].sum().rename("HL")
-            cargas_wagger = df[df["Fuente"] == "WAGGER"].groupby("Jugador")["Monto"].sum().rename("WAGGER")
-            cantidad_cargas = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Monto"].count().rename("Cantidad_Cargas")
-            ultima_carga = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Fecha"].max().rename("Última_Carga")
-            dias_sin_cargar = (pd.Timestamp.now() - ultima_carga).dt.days.rename("Días_sin_cargar")
+        bonos_del_dia = bonos[bonos['Fecha'] == fecha.strftime("%d/%m/%Y")]
+        participo = False
+        bono_usado = ""
 
-            df_resumen = pd.concat([cargas_hl, cargas_wagger, cantidad_cargas, ultima_carga, dias_sin_cargar], axis=1).fillna(0)
-            df_resumen["HL"] = df_resumen["HL"].astype(float)
-            df_resumen["WAGGER"] = df_resumen["WAGGER"].astype(float)
-            df_resumen["Cantidad_Cargas"] = df_resumen["Cantidad_Cargas"].astype(int)
+        for _, b in bonos_del_dia.iterrows():
+            h_ini = int(b['Hora inicio'].split(":")[0])
+            h_fin = int(b['Hora fin'].split(":")[0])
+            min_carga = int(b['Mínimo carga']) if b['Mínimo carga'] else 0
+            bono_tipo = b.get('Tipo bono', '').lower()
 
-            st.subheader("📊 Resumen Consolidado HL + WAGGER")
-            st.dataframe(df_resumen)
-
-            st.subheader("📥 Lista de jugadores VIP actual")
-            lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200)
-            vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
-
-            vip_resumen = df_resumen.reset_index()
-            vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
-            vip_df = vip_resumen[vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
-
-            dias_filtro = st.slider("Mostrar VIPs con más de X días sin cargar", 0, 30, 7)
-            vip_filtrados = vip_df[vip_df["Días_sin_cargar"] >= dias_filtro]
-            st.subheader("📋 Actividad de Jugadores VIP")
-            st.dataframe(vip_filtrados)
-
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                vip_filtrados.to_excel(writer, index=False)
-            st.download_button("📤 Descargar VIPs inactivos", output.getvalue(), file_name="vips_inactivos.xlsx")
-
-            st.subheader("🆕 Posibles nuevos VIPs (no registrados)")
-            df_no_vip = vip_resumen[~vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
-            posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
-            st.dataframe(posibles_vips)
-
-            # --- Análisis de franja horaria VIPs ---
-            st.subheader("⏰ Segmentación horaria de jugadores VIP")
-            st.caption("🕒 Madrugada (00–06), Mañana (06–12), Tarde (12–18), Noche (18–24)")
-
-            df_vips_full = df[df["Jugador_normalizado"].isin(vips_actuales)].copy()
-            df_vips_full["HoraReal"] = pd.to_datetime(df_vips_full["Hora"].astype(str), format="%H:%M:%S", errors="coerce")
-            df_vips_full["HoraEntera"] = df_vips_full["HoraReal"].dt.hour
-            df_vips_full = df_vips_full.dropna(subset=["HoraEntera"])
-
-            def clasificar_franja(h):
-                if 0 <= h < 6:
-                    return "Madrugada"
-                elif 6 <= h < 12:
-                    return "Mañana"
-                elif 12 <= h < 18:
-                    return "Tarde"
+            if h_ini <= hora <= h_fin:
+                if bono_tipo == "primera carga":
+                    if monto >= min_carga:
+                        participo = True
+                        bono_usado = f"{b['Bono % mejorado']} (Primera carga)"
+                    else:
+                        participo = True
+                        bono_usado = f"{b['Bono % base']} (Primera carga)"
+                    break
                 else:
-                    return "Noche"
+                    if monto >= min_carga:
+                        participo = True
+                        bono_usado = f"{b['Bono %']} ({b['Comunidad']})"
+                        break
 
-            df_vips_full["Franja"] = df_vips_full["HoraEntera"].apply(clasificar_franja)
+        resultados.append({
+            "Fecha": fecha,
+            "Usuario": usuario,
+            "Monto": monto,
+            "Hora": hora,
+            "Bono Usado": bono_usado if participo else "No",
+            "Participó": "✅" if participo else "❌"
+        })
 
-            franja_dominante = (
-                df_vips_full.groupby(["Jugador", "Franja"]).size()
-                .reset_index(name="Cargas")
-                .sort_values(by=["Jugador", "Cargas"], ascending=[True, False])
-                .drop_duplicates("Jugador")
-            )
+    return pd.DataFrame(resultados)
 
-            hora_frecuente = (
-                df_vips_full.groupby(["Jugador", "HoraEntera"]).size()
-                .reset_index(name="Frecuencia")
-                .sort_values(by=["Jugador", "Frecuencia"], ascending=[True, False])
-                .drop_duplicates("Jugador")
-            )
-            hora_frecuente["Hora"] = hora_frecuente["HoraEntera"].astype(int).astype(str).str.zfill(2) + ":00"
+# --- UI: SUBIDA DE REPORTE ---
+archivo = st.file_uploader("📁 Subí el reporte diario del casino", type=["csv", "xlsx"])
 
-            patron_horario = franja_dominante.merge(hora_frecuente[["Jugador", "Hora"]], on="Jugador")
-            patron_horario.rename(columns={"Hora": "Hora_Más_Frecuente"}, inplace=True)
+if archivo:
+    df_reporte = pd.read_excel(archivo) if archivo.name.endswith(".xlsx") else pd.read_csv(archivo)
+    vip_list, bonos = cargar_data()
+    df_resultado = analizar_participacion(df_reporte, vip_list, bonos)
 
-            st.subheader("📋 Comportamiento Horario de VIPs")
-            st.dataframe(patron_horario)
+    st.success("✅ Análisis completo. Resultados:")
+    st.dataframe(df_resultado)
 
-            st.subheader("📊 VIPs agrupados por franja horaria")
-            tabla_franjas = patron_horario.groupby("Franja").agg({
-                "Jugador": list,
-                "Jugador": "count"
-            }).rename(columns={"Jugador": "Total_VIPs"}).reset_index()
+    # Descargar CSV
+    st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
 
-            tabla_franjas["Jugadores con hora pico"] = tabla_franjas["Franja"].apply(lambda fr: ", ".join([
-                f"{row['Jugador']} ({row['Hora_Más_Frecuente']})"
-                for _, row in patron_horario[patron_horario["Franja"] == fr].iterrows()
-            ]))
-
-            st.dataframe(tabla_franjas[["Franja", "Total_VIPs", "Jugadores con hora pico"]])
-
-
-elif seccion == "🎰 Comunidad VIP - Eros":
-    st.header("🎰 Comunidad VIP - Eros")
-
-    archivo_eros = st.file_uploader("📁 Subí el archivo de cargas de Eros:", type=["xlsx", "xls", "csv"], key="vip_eros")
-    if archivo_eros:
-        df = pd.read_excel(archivo_eros) if archivo_eros.name.endswith((".xlsx", ".xls")) else pd.read_csv(archivo_eros)
-        df = preparar_dataframe(df)
-
-        if df is not None:
-            df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-            df["Monto"] = pd.to_numeric(df["Monto"], errors="coerce").fillna(0)
-            df["Jugador"] = df["Jugador"].astype(str).str.strip()
-            df["Jugador_normalizado"] = df["Jugador"].str.lower()
-            df["Plataforma"] = df["Plataforma"].astype(str).str.strip()
-            df = df[df["Tipo"] == "in"]
-
-            hl_eros = "hl_Erosonline"
-            salas_eros = {
-                "Eros_wagger30%", "Eros_wagger40%", "Eros_wagger50%",
-                "Eros_wagger100%", "Eros_wagger150%", "Eros_wagger200%"
-            }
-            df["Fuente"] = df["Plataforma"].apply(lambda x: "HL" if x == hl_eros else ("WAGGER" if x in salas_eros else "OTRO"))
-
-            cargas_hl = df[df["Fuente"] == "HL"].groupby("Jugador")["Monto"].sum().rename("HL")
-            cargas_wagger = df[df["Fuente"] == "WAGGER"].groupby("Jugador")["Monto"].sum().rename("WAGGER")
-            cantidad_cargas = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Monto"].count().rename("Cantidad_Cargas")
-            ultima_carga = df[df["Fuente"].isin(["HL", "WAGGER"])].groupby("Jugador")["Fecha"].max().rename("Última_Carga")
-            ultima_carga = pd.to_datetime(ultima_carga, errors="coerce")
-            dias_sin_cargar = (pd.Timestamp.now() - ultima_carga).dt.days.rename("Días_sin_cargar")
-
-            df_resumen = pd.concat([cargas_hl, cargas_wagger, cantidad_cargas, ultima_carga, dias_sin_cargar], axis=1).fillna(0)
-            df_resumen["HL"] = df_resumen["HL"].astype(float)
-            df_resumen["WAGGER"] = df_resumen["WAGGER"].astype(float)
-            df_resumen["Cantidad_Cargas"] = df_resumen["Cantidad_Cargas"].astype(int)
-
-            st.subheader("📊 Resumen Consolidado HL + WAGGER - Eros")
-            st.dataframe(df_resumen)
-
-            st.subheader("📥 Lista de jugadores VIP de Eros")
-            lista_vips = st.text_area("Pegá los nombres de jugadores VIP (uno por línea):", height=200, key="vip_list_eros")
-            vips_actuales = [nombre.strip().lower() for nombre in lista_vips.split("\n") if nombre.strip() != ""]
-
-            vip_resumen = df_resumen.reset_index()
-            vip_resumen["Jugador_normalizado"] = vip_resumen["Jugador"].str.lower()
-            vip_df = vip_resumen[vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
-
-            dias_filtro = st.slider("Mostrar VIPs con más de X días sin cargar", 0, 30, 7, key="eros_dias")
-            vip_filtrados = vip_df[vip_df["Días_sin_cargar"] >= dias_filtro]
-            st.subheader("📋 Actividad de Jugadores VIP - Eros")
-            st.dataframe(vip_filtrados)
-
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                vip_filtrados.to_excel(writer, index=False)
-            st.download_button("📤 Descargar VIPs inactivos (Eros)", output.getvalue(), file_name="vips_inactivos_eros.xlsx")
-
-            st.subheader("🆕 Posibles nuevos VIPs (Eros)")
-            df_no_vip = vip_resumen[~vip_resumen["Jugador_normalizado"].isin(vips_actuales)]
-            posibles_vips = df_no_vip[(df_no_vip["HL"] + df_no_vip["WAGGER"] > 10000) | (df_no_vip["Cantidad_Cargas"] >= 5)]
-            st.dataframe(posibles_vips)
