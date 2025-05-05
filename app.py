@@ -87,24 +87,28 @@ if archivo:
     st.success("✅ Análisis completo. Resultados:")
     st.dataframe(df_resultado)
 
-    # --- GUARDADO EN LA HOJA DE ACTIVIDAD ---
-    datos_guardar = [df_resultado.columns.tolist()] + df_resultado.values.tolist()
-    hoja_actividad.clear()
-    hoja_actividad.update("A1", datos_guardar)
-    st.success("📊 Los resultados fueron guardados en la hoja 'actividad_diaria_vip'.")
+    if not df_resultado.empty:
+        # --- GUARDADO EN LA HOJA DE ACTIVIDAD ---
+        datos_guardar = [df_resultado.columns.tolist()] + df_resultado.values.tolist()
+        hoja_actividad.clear()
+        hoja_actividad.update("A1", datos_guardar)
+        st.success("📊 Los resultados fueron guardados en la hoja 'actividad_diaria_vip'.")
 
-    # --- GRÁFICO DE PARTICIPACIÓN ---
-    st.subheader("📊 Participación de los VIPs en el día")
-    participacion_count = df_resultado["Participó"].value_counts().reset_index()
-    participacion_count.columns = ["Resultado", "Cantidad"]
-    st.bar_chart(participacion_count.set_index("Resultado"))
+        # --- GRÁFICO DE PARTICIPACIÓN ---
+        if "Participó" in df_resultado.columns:
+            st.subheader("📊 Participación de los VIPs en el día")
+            participacion_count = df_resultado["Participó"].value_counts().reset_index()
+            participacion_count.columns = ["Resultado", "Cantidad"]
+            st.bar_chart(participacion_count.set_index("Resultado"))
 
-    # --- FILTRO POR USUARIO ---
-    st.subheader("🔎 Filtrar actividad por jugador")
-    jugador_seleccionado = st.selectbox("Elegí un jugador:", options=df_resultado["Usuario"].unique())
-    filtrado = df_resultado[df_resultado["Usuario"] == jugador_seleccionado]
-    st.dataframe(filtrado)
+        # --- FILTRO POR USUARIO ---
+        st.subheader("🔎 Filtrar actividad por jugador")
+        jugador_seleccionado = st.selectbox("Elegí un jugador:", options=df_resultado["Usuario"].unique())
+        filtrado = df_resultado[df_resultado["Usuario"] == jugador_seleccionado]
+        st.dataframe(filtrado)
 
-    # --- DESCARGA CSV ---
-    st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
+        # --- DESCARGA CSV ---
+        st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
+    else:
+        st.warning("⚠️ No se encontraron jugadores VIP activos o no coincidieron los criterios del bono.")
 
