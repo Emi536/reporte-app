@@ -28,6 +28,7 @@ def cargar_data():
 def analizar_participacion(df_reporte, vip_list, bonos):
     df_reporte['Fecha'] = pd.to_datetime(df_reporte['Fecha'], errors='coerce')
     df_reporte['Hora'] = pd.to_datetime(df_reporte['Tiempo'], format="%H:%M:%S", errors='coerce').dt.hour
+    df_reporte['Depositar'] = pd.to_numeric(df_reporte['Depositar'], errors='coerce').fillna(0)
     df_reporte = df_reporte.dropna(subset=['Fecha', 'Hora'])
 
     resultados = []
@@ -52,11 +53,23 @@ def analizar_participacion(df_reporte, vip_list, bonos):
         bono_usado = ""
 
         for _, b in bonos_del_dia.iterrows():
-            h_ini = int(b['Hora inicio'].split(":")[0])
-            h_fin = int(b['Hora fin'].split(":")[0])
-            min_carga = int(b['Mínimo carga']) if b['Mínimo carga'] else 0
-            min_mejorado = int(b['Mínimo mejorado']) if 'Mínimo mejorado' in b and b['Mínimo mejorado'] else None
-            bono_tipo = b.get('Tipo bono', '').lower()
+            try:
+                h_ini = int(str(b['Hora inicio']).split(":")[0].strip())
+                h_fin = int(str(b['Hora fin']).split(":")[0].strip())
+            except:
+                continue
+
+            try:
+                min_carga = int(str(b['Mínimo carga']).strip()) if b['Mínimo carga'] else 0
+            except:
+                min_carga = 0
+
+            try:
+                min_mejorado = int(str(b['Mínimo mejorado']).strip()) if b['Mínimo mejorado'] else None
+            except:
+                min_mejorado = None
+
+            bono_tipo = str(b.get('Tipo bono', '')).lower()
 
             if h_ini <= hora <= h_fin:
                 if bono_tipo == "primera carga":
@@ -66,11 +79,10 @@ def analizar_participacion(df_reporte, vip_list, bonos):
                     elif monto >= min_carga:
                         participo = True
                         bono_usado = f"{b['Bono % base']} ({comunidad})"
-
                 else:
                     if monto >= min_carga:
                         participo = True
-                        bono_usado = f"{b['Bono % base']} ({b['Comunidad']})"
+                        bono_usado = f"{b['Bono % base']} ({comunidad})"
 
         resultados.append({
             "Fecha": fecha,
@@ -118,4 +130,3 @@ if archivo:
         st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
     else:
         st.warning("⚠️ No se encontraron jugadores VIP activos o no coincidieron los criterios del bono.")
-
