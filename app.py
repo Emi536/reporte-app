@@ -27,12 +27,12 @@ def cargar_data():
 
 def analizar_participacion(df_reporte, vip_list, bonos):
     df_reporte['Fecha'] = pd.to_datetime(df_reporte['Fecha'], errors='coerce')
-    df_reporte['Hora'] = pd.to_datetime(df_reporte['Tiempo'], format="%H:%M:%S", errors='coerce').dt.hour
+    df_reporte['Tiempo'] = pd.to_datetime(df_reporte['Tiempo'], format="%H:%M:%S", errors='coerce')
+    df_reporte['Hora'] = df_reporte['Tiempo'].dt.hour
     df_reporte['Depositar'] = pd.to_numeric(df_reporte['Depositar'], errors='coerce').fillna(0)
     df_reporte = df_reporte.dropna(subset=['Fecha', 'Hora'])
 
     resultados = []
-    df_reporte.sort_values(by=['Al usuario', 'Fecha', 'Hora'], inplace=True)
 
     for _, row in df_reporte.iterrows():
         usuario = row['Al usuario']
@@ -40,21 +40,18 @@ def analizar_participacion(df_reporte, vip_list, bonos):
         hora = row['Hora']
         monto = row['Depositar']
         fecha = row['Fecha'].date()
+        tiempo = row['Tiempo'].strftime("%H:%M:%S")
 
+        comunidad = ""
         if "Fenix" in del_usuario:
             comunidad = "Fenix"
         elif "Eros" in del_usuario:
             comunidad = "Eros"
-        else:
-            comunidad = ""
 
-        bonos_del_dia = bonos[
-            (bonos['Fecha'] == fecha.strftime("%d/%m/%Y")) &
-            (bonos['Comunidad'].str.lower() == comunidad.lower())
-        ]
-
+        bonos_del_dia = bonos[(bonos['Fecha'] == fecha.strftime("%d/%m/%Y")) &
+                              (bonos['Comunidad'].str.lower() == comunidad.lower())]
         participo = False
-        bono_usado = ""
+        bono_usado = "No"
 
         for _, b in bonos_del_dia.iterrows():
             try:
@@ -76,33 +73,55 @@ def analizar_participacion(df_reporte, vip_list, bonos):
             bono_tipo = str(b.get('Tipo bono', '')).lower()
 
             if h_ini <= hora <= h_fin:
-                if bono_tipo == "primera carga":
-                    cargas_dia = df_reporte[
-                        (df_reporte['Al usuario'] == usuario) &
-                        (df_reporte['Fecha'].dt.date == fecha)
-                    ]
-                    if not cargas_dia.empty and row.equals(cargas_dia.iloc[0]):
-                        if min_mejorado and monto >= min_mejorado:
-                            participo = True
-                            bono_usado = f"{b['Bono % mejorado']} ({comunidad})"
-                        elif monto >= min_carga:
-                            participo = True
-                            bono_usado = f"{b['Bono % base']} ({comunidad})"
-                else:
-                    if monto >= min_carga:
-                        participo = True
-                        bono_usado = f"{b['Bono % base']} ({comunidad})"
+                if min_mejorado and monto >= min_mejorado:
+                    participo = True
+                    bono_usado = f"{b['Bono % mejorado']}% ({comunidad})"
+                elif monto >= min_carga:
+                    participo = True
+                    bono_usado = f"{b['Bono % base']}% ({comunidad})"
 
         resultados.append({
             "Fecha": fecha.strftime("%d/%m/%Y"),
             "Usuario": usuario,
+            "Comunidad": comunidad,
             "Monto": monto,
-            "Hora": hora,
-            "Bono Usado": bono_usado if participo else "No",
+            "Hora de carga": tiempo,
+            "Bono Usado": bono_usado,
             "Participó": "✅" if participo else "❌"
         })
 
-    return pd.DataFrame(resultados)
+    df_resultado = pd.DataFrame(resultados)
+
+    # Agrupación por usuario y bono
+    resumen = df_resultado[df_resultado["Participó"] == "✅"].groupby(['Usuario', 'Bono Usado', 'Comunidad'], as_index=False).agg({
+        'Monto': 'sum',
+        'Hora de carga': 'last',
+        'Participó': 'count'
+    })
+    resumen.rename(columns={
+        'Monto': 'Monto Total',
+        'Participó': 'Veces que usó el bono'
+    }, inplace=True)
+
+    # % sobre el total
+    total_general = resumen['Monto Total'].sum()
+    resumen['% del Total'] = (resumen['Monto Total'] / total_general * 100).round(2).astype(str) + "%"
+
+    # Agregar los usuarios que no participaron
+    usuarios_con_datos = resumen['Usuario'].unique()
+    for jugador in vip_list['usuario']:
+        if jugador not in usuarios_con_datos:
+            resumen = pd.concat([resumen, pd.DataFrame([{
+                "Usuario": jugador,
+                "Bono Usado": "No",
+                "Comunidad": "",
+                "Monto Total": 0,
+                "Hora de carga": "",
+                "Veces que usó el bono": 0,
+                "% del Total": "0%"
+            }])], ignore_index=True)
+
+    return resumen
 
 # --- UI: SUBIDA DE REPORTE ---
 archivo = st.file_uploader("📁 Subí el reporte diario del casino", type=["csv", "xlsx"])
@@ -115,27 +134,5 @@ if archivo:
     st.success("✅ Análisis completo. Resultados:")
     st.dataframe(df_resultado)
 
-    if not df_resultado.empty:
-        # --- GUARDADO EN LA HOJA DE ACTIVIDAD ---
-        datos_guardar = [df_resultado.columns.tolist()] + df_resultado.values.tolist()
-        hoja_actividad.clear()
-        hoja_actividad.update("A1", datos_guardar)
-        st.success("📊 Los resultados fueron guardados en la hoja 'actividad_diaria_vip'.")
-
-        # --- GRÁFICO DE PARTICIPACIÓN ---
-        if "Participó" in df_resultado.columns:
-            st.subheader("📊 Participación de los VIPs en el día")
-            participacion_count = df_resultado["Participó"].value_counts().reset_index()
-            participacion_count.columns = ["Resultado", "Cantidad"]
-            st.bar_chart(participacion_count.set_index("Resultado"))
-
-        # --- FILTRO POR USUARIO ---
-        st.subheader("🔎 Filtrar actividad por jugador")
-        jugador_seleccionado = st.selectbox("Elegí un jugador:", options=df_resultado["Usuario"].unique())
-        filtrado = df_resultado[df_resultado["Usuario"] == jugador_seleccionado]
-        st.dataframe(filtrado)
-
-        # --- DESCARGA CSV ---
-        st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip.csv")
-    else:
-        st.warning("⚠️ No se encontraron jugadores VIP activos o no coincidieron los criterios del bono.")
+    # --- DESCARGA CSV ---
+    st.download_button("📤 Descargar resultados", data=df_resultado.to_csv(index=False), file_name="actividad_vip_resumen.csv")
