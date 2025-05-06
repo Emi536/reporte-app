@@ -3,4 +3,4 @@ gspread
 pandas
 openpyxl
 google-auth
-plotly.express
+plotly
